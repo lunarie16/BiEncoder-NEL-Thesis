@@ -1,0 +1,112 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: micro-macro-eval-krohne
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+        - name: biencoder-nel
+          image: registry.datexis.com/mmenke/biencoder-nel:0.2.28
+          command: ["/bin/sh", "-c"]
+#          args: ["ray start --node-ip-address=$MY_POD_IP --num-cpus=0 --address=$RAY_HEAD_SERVICE_HOST:$RAY_HEAD_SERVICE_PORT_REDIS_PRIMARY --object-manager-port=12345 --node-manager-port=12346  && cd .. && python biencoder/src/train_default.py"]
+          args: ["cd .. && python biencoder/src/train_default.py" ]
+          volumeMounts:
+            - name: krohne-data
+              mountPath: /data
+            - name: root-temp
+              mountPath: /root
+            - name: ray-pvc
+              mountPath: /pvc
+            - name: ssh-key
+              mountPath: /root/ssh-key
+          ports:
+            - containerPort: 12345 # Ray internal communication.
+            - containerPort: 12346 # Ray internal communication.
+          env:
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MODEL_NAME
+              value: "train_default_eval-nbs8-il50-bs82-lr9.157438840569144e-05-wu100-ep150-uncased--cuda"
+            - name: HPO
+              value: "False"
+            - name: EVALUATE
+              value: "True"
+            - name: CREATE_CONCEPT_EMB
+              value: "False"
+            - name: TRAIN_NER
+              value: "False"
+            - name: NER_BATCH_SIZE
+              value: "8"
+            - name: BERT_MODEL
+              value: "bert-base-german-dbmdz-uncased"
+            - name: BATCH_SIZE
+              value: "82"
+            - name: EPOCHS
+              value: "150"
+            - name: LEARNING_RATE
+              value: "9.157438840569144e-05"
+            - name: FREEZE_EMB
+              value: "True"
+            - name: WARMUP_STEPS
+              value: "100"
+            - name: INPUT_LENGTH
+              value: "50"
+            - name: VALTEST_INTERVAL
+              value: "1"
+            - name: FORCE_CPU
+              value: "False"
+            - name: PATH_KB
+              value: "/data/datasets/krohne_products_description_texoo.json"
+            - name: PATH_TRAIN
+              value: "/data/datasets/krohne_servicetickets_train_annotations_texoo.json"
+            - name: PATH_TEST
+              value: "/data/datasets/krohne_servicetickets_test_annotations_texoo.json"
+            - name: PATH_DEV
+              value: "/data/datasets/krohne_servicetickets_dev_annotations_texoo.json"
+            - name: PATH_MODEL
+              value: "/data/biencoder/model/"
+            - name: PATH_TENSORBOARD
+              value: "/data/biencoder/runs/"
+            - name: PATH_RAY
+              value: "/data/biencoder/runs/ray"
+            - name: OMP_NUM_THREADS
+              value: "8"
+            - name: COMMENT
+              value: "test-hp"
+            - name: FIX_RANDOM_SEED
+              value: "True"
+
+          resources:
+            requests:
+              nvidia.com/gpu: 1
+              cpu: 1
+              memory: 50Gi
+            limits:
+              nvidia.com/gpu: 1
+              memory: 120Gi
+              cpu: 8
+      imagePullSecrets:
+        - name: private-registry-auth
+      restartPolicy: Never
+      nodeSelector:
+        gpu: v100
+      volumes:
+        - name: krohne-data
+          persistentVolumeClaim:
+            claimName: krohne-data
+        - name: root-temp
+          persistentVolumeClaim:
+            claimName: root-temp
+        - name: ssh-key
+          secret:
+            secretName: my-ssh-public-key
+            defaultMode: 256
+        - name: ray-pvc
+          persistentVolumeClaim:
+            claimName: ray-pvc
+
+

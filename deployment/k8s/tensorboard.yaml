@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tensorboard-biencoder
+  labels:
+    app: tensorboard-biencoder
+spec:
+  selector:
+    matchLabels:
+      app: tensorboard-biencoder
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: tensorboard-biencoder
+    spec:
+      containers:
+        - name: tensorboard-biencoder
+          image: tensorflow/tensorflow:latest
+          command: ['sh', '-c', 'tensorboard --logdir /data/biencoder/runs/']
+          volumeMounts:
+           - name: krohne-data
+             mountPath: /data
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 1
+            limits:
+              memory: 2Gi
+              cpu: 1
+          ports:
+            - containerPort: 6006
+      volumes:
+        - name: krohne-data
+          persistentVolumeClaim:
+            claimName: krohne-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tensorboard-biencoder
+spec:
+  ports:
+  - port: 80
+    targetPort: 6006
+    protocol: TCP
+  selector:
+    app: tensorboard-biencoder
